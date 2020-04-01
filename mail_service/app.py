@@ -1,42 +1,50 @@
 import json
+import boto3
 
-# import requests
+def send_mail(destination, message):
+    """ sends an e-mail using SES with the given parameters """
+    
+    ses = boto3.client('ses')
+    response = ses.send_email(
+        Source='no-reply@45plus.oev-berlin.de',
+        Destination={
+            'ToAddresses': [
+                destination,
+            ]
+        },
+        Message={
+            'Subject': {
+                'Data': 'Betreff 45plus'
+            },
+            'Body': {
+                'Text': {
+                    'Data': message
+                }
+            }
+        }
+    )
+    return response
 
 
 def lambda_handler(event, context):
-    """Sample pure Lambda function
+    """Sample pure Lambda function """
+    
+    data = json.loads(event['body'])
+    destination = data['email']
+    try:
+        message = data['message']
+    except:
+        message = "no message set"
 
-    Parameters
-    ----------
-    event: dict, required
-        API Gateway Lambda Proxy Input Format
 
-        Event doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html#api-gateway-simple-proxy-for-lambda-input-format
-
-    context: object, required
-        Lambda Context runtime methods and attributes
-
-        Context doc: https://docs.aws.amazon.com/lambda/latest/dg/python-context-object.html
-
-    Returns
-    ------
-    API Gateway Lambda Proxy Output Format: dict
-
-        Return doc: https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-lambda-proxy-integrations.html
-    """
-
-    # try:
-    #     ip = requests.get("http://checkip.amazonaws.com/")
-    # except requests.RequestException as e:
-    #     # Send some context about this error to Lambda Logs
-    #     print(e)
-
-    #     raise e
+    response = send_mail(destination, message)
 
     return {
         "statusCode": 200,
-        "body": json.dumps({
-            "message": "hello world",
-            # "location": ip.text.replace("\n", "")
-        }),
+        "body": json.dumps(response),
+        "headers": { 
+            'Access-Control-Allow-Origin' : '*',
+            'Access-Control-Allow-Credentials' : True,
+            'Content-Type': 'application/json'
+        },
     }
