@@ -1,0 +1,37 @@
+
+
+service: plus-sls-mail-service
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: dev
+  region: eu-west-1
+  apiKeys:
+    - 45plus-${opt:stage, self:provider.stage}
+  usagePlan:
+    quota:
+      limit: 500
+      offset: 2
+      period: MONTH
+    throttle:
+      burstLimit: 200
+      rateLimit: 100
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - se:SendEmail
+      Resource: 'arn:aws:ses:eu-central-1:326094939662:identity/*'
+
+functions:
+  hello:
+    handler: app/send_mail.lambda_handler
+    events:
+      - http:
+          path: send_mail
+          method: POST
+          cors: true
+          private: true
+
+plugins:
+  - serverless-pseudo-parameters
