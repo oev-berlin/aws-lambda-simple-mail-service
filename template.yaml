@@ -11,7 +11,22 @@ Parameters:
     AllowedValues:
       - prod
       - dev
+  SenderMail:
+    Description: A SES verified mail address for sending 
+    Type: String
 
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: simple-mail-service
+    Description: hello world
+    Author: oev
+    SpdxLicenseId: MIT
+    LicenseUrl: LICENSE.txt
+    ReadmeUrl: README.md
+    Labels: ['api-gateway', 'lambda', 'email', 'mail']
+    HomePageUrl: https://github.com/oev-berlin/aws-lambda-simple-mail-service
+    SemanticVersion: 0.0.1
+    SourceCodeUrl: https://github.com/oev-berlin/aws-lambda-simple-mail-service
 
 Globals:
   Function:
@@ -25,18 +40,40 @@ Globals:
       AllowOrigin: "'*'"
 
 Resources:    
-  ApiGateway:
+  MyApi:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref Stage
       Auth:
-        ApiKeyRequired: true
+        ApiKeyRequired: true # sets for all methods
   ApiKey:
     Type: AWS::ApiGateway::ApiKey
     Properties:
+      Name: !Sub ${AWS::StackName}-api-key
+      Enabled: true
       StageKeys:
-        - RestApiId: !Ref ApiGateway
-          StageName: !Ref Stage
+          - RestApiId: !Ref MyApi
+            StageName: !Ref Stage
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+        ApiStages:
+            - ApiId: !Ref MyApi
+              Stage: !Ref Stage
+        Description: Usage Plan
+        Quota:
+            Limit: 1000
+            Period: MONTH
+        Throttle:
+            BurstLimit: 10
+            RateLimit: 10
+        UsagePlanName: !Sub ${AWS::StackName}-api-usageplan
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+        KeyId: !Ref ApiKey
+        KeyType: API_KEY
+        UsagePlanId: !Ref UsagePlan
         
   MailFunction:
     Type: AWS::Serverless::Function 
@@ -50,12 +87,12 @@ Resources:
           Effect: Allow
           Action:
           - ses:SendEmail
-          Resource: 'arn:aws:ses:eu-central-1:326094939662:identity/*'
+          Resource: !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SenderMail}'
       Events:
         HelloWorld:
           Type: Api
           Properties:
-            RestApiId: !Ref ApiGateway
+            RestApiId: !Ref MyApi
             Path: /send_mail
             Method: POST
             
