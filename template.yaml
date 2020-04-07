@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  email-service
+
+Parameters:
+  Stage:
+    Description: The stage of the api gateway
+    Type: String
+    Default: prod
+    AllowedValues:
+      - prod
+      - dev
+  SenderMail:
+    Description: A SES verified mail address for sending 
+    Type: String
+
+
+Globals:
+  Function:
+    Timeout: 3
+
+  Api:
+    OpenApiVersion: 3.0.1
+    Cors:
+      AllowMethods: "'*'"
+      AllowHeaders: "'*'"
+      AllowOrigin: "'*'"
+
+Resources:    
+  MyApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        ApiKeyRequired: true # sets for all methods
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub ${AWS::StackName}-api-key
+      Enabled: true
+      StageKeys:
+          - RestApiId: !Ref MyApi
+            StageName: !Ref Stage
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+        ApiStages:
+            - ApiId: !Ref MyApi
+              Stage: !Ref Stage
+        Description: Usage Plan
+        Quota:
+            Limit: 1000
+            Period: MONTH
+        Throttle:
+            BurstLimit: 10
+            RateLimit: 10
+        UsagePlanName: !Sub ${AWS::StackName}-api-usageplan
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+        KeyId: !Ref ApiKey
+        KeyType: API_KEY
+        UsagePlanId: !Ref UsagePlan
+        
+  MailFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: mail_service/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Policies:
+      - Statement:
+        - Sid: SESSendMail
+          Effect: Allow
+          Action:
+          - ses:SendEmail
+          Resource: !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/${SenderMail}'
+      Events:
+        HelloWorld:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MyApi
+            Path: /send_mail
+            Method: POST
+            
